@@ -12,11 +12,18 @@ rec {
       perSystem = {
         system,
         pkgs,
+        lib,
         ...
       }: let
         info = {
           projectName = "reactions";
         };
+        libs = with pkgs; [
+          pango
+          cairo
+          glib
+          gtk3
+        ];
       in
         (
           {
@@ -27,7 +34,11 @@ rec {
               packages = with pkgs; [
                 go
                 delve
-              ];
+                pkg-config
+              ] ++ libs;
+
+              LD_LIBRARY_PATH = lib.makeLibraryPath libs;
+              PKG_CONFIG_PATH = lib.makeSearchPath "lib/pkgconfig" libs;
             };
             packages = {
               ${projectName} = pkgs.buildGoModule {
