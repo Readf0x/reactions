@@ -19,7 +19,8 @@ rec {
         pango
         cairo
         glib
-        gtk3
+        gtk4
+        gobject-introspection
       ];
     in {
       devShells.default = pkgs.mkShell {
@@ -31,7 +32,7 @@ rec {
           ]
           ++ libs;
 
-        GSETTINGS_SCHEMA_DIR = "${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}/glib-2.0/schemas";
+        GSETTINGS_SCHEMA_DIR = "${pkgs.gtk4}/share/gsettings-schemas/${pkgs.gtk4.name}/glib-2.0/schemas";
       };
       packages = {
         ${projectName} = pkgs.buildGoModule {
