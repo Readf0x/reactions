@@ -28,7 +28,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	win.SetTitle("Test")
+	win.SetTitle("Siffrin Jail")
 	win.Connect("destroy", func() {
 		gtk.MainQuit()
 	})
