@@ -17,15 +17,11 @@ import (
 var showdialog = true
 var location string
 
-var imageExts = map[string]struct{}{
-	".png":  {},
-	".jpg":  {},
-	".jpeg": {},
-	".gif":  {},
-	".bmp":  {},
-	".webp": {},
-	".tiff": {},
-	".svg":  {},
+var imageExts = map[string]string{
+	".png":  "image/png",
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif":  "image/gif",
 }
 
 func main() {
@@ -111,12 +107,24 @@ func DraggableImage(path string) (pic *gtk.Picture) {
 	source := gtk.NewDragSource()
 	source.SetActions(gdk.ActionCopy)
 	pic.AddController(source)
-	source.ConnectPrepare(func(_, _ float64) (contentProvider *gdk.ContentProvider) {
-		contentProvider = gdk.NewContentProviderForBytes("text/uri-list", glib.NewBytes([]byte("file://" + path)))
-		return
-	})
+	source.ConnectPrepare(generatePrepare(path))
 	source.SetIcon(pic.Paintable(), 0, 0)
 
 	return
+}
+
+func generatePrepare(path string) func(_, _ float64) (contentProvider *gdk.ContentProvider) {
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	mime := imageExts[filepath.Ext(path)]
+	gbytes := glib.NewBytes(bytes)
+	return func(_, _ float64) (contentProvider *gdk.ContentProvider) {
+		uri := gdk.NewContentProviderForBytes("text/uri-list", glib.NewBytes([]byte("file://" + path)))
+		raw := gdk.NewContentProviderForBytes(mime, gbytes)
+		contentProvider = gdk.NewContentProviderUnion([]*gdk.ContentProvider{uri,raw})
+		return
+	}
 }
 
