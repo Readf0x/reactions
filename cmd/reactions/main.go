@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -9,9 +11,17 @@ import (
 	"github.com/gotk3/gotk3/gtk"
 )
 
-const path = "/home/readf0x/Pictures/Reactions"
-
 func main() {
+	showdialog := true
+	location := flag.String("path", "", "Location of reactions")
+	flag.Parse()
+	if env, set := os.LookupEnv("REACTION_PATH"); set && env != "" {
+		*location = env
+	}
+	if *location != "" {
+		showdialog = false
+	}
+
 	gtk.Init(nil)
 
 	win, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
@@ -23,20 +33,39 @@ func main() {
 		gtk.MainQuit()
 	})
 
+	if showdialog {
+		dialog, _ := gtk.FileChooserDialogNewWith2Buttons(
+			"Select a folder",
+			win,
+			gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
+			"Cancel", gtk.RESPONSE_CANCEL,
+			"Select", gtk.RESPONSE_ACCEPT,
+		)
+
+		dialog.SetCurrentFolder(os.Getenv("HOME"))
+
+		response := dialog.Run()
+		if response == gtk.RESPONSE_ACCEPT {
+			*location = dialog.GetFilename()
+		}
+
+		dialog.Destroy()
+	}
+
 	flowBox, err := gtk.FlowBoxNew()
 	flowBox.SetSelectionMode(gtk.SELECTION_NONE)
 	flowBox.SetMaxChildrenPerLine(2)
 	flowBox.SetRowSpacing(8)
 	flowBox.SetColumnSpacing(8)
 
-	files, err := os.ReadDir(path)
+	files, err := os.ReadDir(*location)
 	if err != nil {
 		log.Fatal(err)
 	}
 	var pics []Draggable
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".png") {
-			d, err := NewDraggable(path + "/" + file.Name())
+			d, err := NewDraggable(fmt.Sprintf("%s%c%s", *location, os.PathSeparator, file.Name()))
 			if err != nil {
 				log.Fatal(err)
 			}
