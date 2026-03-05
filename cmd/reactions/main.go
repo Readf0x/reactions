@@ -1,114 +1,122 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
-	"github.com/gotk3/gotk3/gdk"
-	"github.com/gotk3/gotk3/gtk"
+	"github.com/diamondburned/gotk4/pkg/gdk/v4"
+	"github.com/diamondburned/gotk4/pkg/gio/v2"
+	"github.com/diamondburned/gotk4/pkg/glib/v2"
+	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 )
 
+var showdialog = true
+var location string
+
+var imageExts = map[string]struct{}{
+	".png":  {},
+	".jpg":  {},
+	".jpeg": {},
+	".gif":  {},
+	".bmp":  {},
+	".webp": {},
+	".tiff": {},
+	".svg":  {},
+}
+
 func main() {
-	showdialog := true
-	location := flag.String("path", "", "Location of reactions")
+	flag.StringVar(&location, "path", "", "Location of reactions")
 	flag.Parse()
 	if env, set := os.LookupEnv("REACTION_PATH"); set && env != "" {
-		*location = env
+		location = env
 	}
-	if *location != "" {
+	if location != "" {
 		showdialog = false
 	}
 
-	gtk.Init(nil)
+	app := gtk.NewApplication("com.github.readf0x.reactions", gio.ApplicationFlagsNone)
+	app.ConnectActivate(func() { activate(app) })
 
-	win, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
-	if err != nil {
-		log.Fatal(err)
+	if code := app.Run(nil); code > 0 {
+		os.Exit(code)
 	}
+}
+
+func activate(app *gtk.Application) {
+	win := gtk.NewApplicationWindow(app)
 	win.SetTitle("Siffrin Jail")
-	win.Connect("destroy", func() {
-		gtk.MainQuit()
-	})
+	win.SetDefaultSize(400, 800)
 
 	if showdialog {
-		dialog, _ := gtk.FileChooserDialogNewWith2Buttons(
-			"Select a folder",
-			win,
-			gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER,
-			"Cancel", gtk.RESPONSE_CANCEL,
-			"Select", gtk.RESPONSE_ACCEPT,
-		)
+		dialog := gtk.NewFileDialog()
 
-		dialog.SetCurrentFolder(os.Getenv("HOME"))
-
-		response := dialog.Run()
-		if response == gtk.RESPONSE_ACCEPT {
-			*location = dialog.GetFilename()
-		}
-
-		dialog.Destroy()
+		dialog.SelectFolder(context.Background(), nil, func(res gio.AsyncResulter) {
+			file, err := dialog.SelectFolderFinish(res)
+			if err != nil {
+				log.Fatal(err)
+			}
+			location = file.ParseName()
+			createWindow(win)
+		})
+	} else {
+		createWindow(win)
 	}
+}
 
-	flowBox, err := gtk.FlowBoxNew()
-	flowBox.SetSelectionMode(gtk.SELECTION_NONE)
+func createWindow(win *gtk.ApplicationWindow) {
+	flowBox := gtk.NewFlowBox()
+	flowBox.SetSelectionMode(gtk.SelectionNone)
+	flowBox.SetHomogeneous(false)
 	flowBox.SetMaxChildrenPerLine(2)
 	flowBox.SetRowSpacing(8)
 	flowBox.SetColumnSpacing(8)
 
-	files, err := os.ReadDir(*location)
+	files, err := os.ReadDir(location)
 	if err != nil {
 		log.Fatal(err)
 	}
-	var pics []Draggable
 	for _, file := range files {
-		if strings.HasSuffix(file.Name(), ".png") {
-			d, err := NewDraggable(fmt.Sprintf("%s%c%s", *location, os.PathSeparator, file.Name()))
+		ext := strings.ToLower(filepath.Ext(file.Name()))
+		if _, ok := imageExts[ext]; ok {
+			pic := DraggableImage(filepath.Join(location, file.Name()))
 			if err != nil {
 				log.Fatal(err)
 			}
-			pics = append(pics, d)
-			flowBox.Add(d.EventBox)
+			flowBox.Append(pic)
 		}
 	}
 
-	scroll, err := gtk.ScrolledWindowNew(nil, nil)
+	scroll := gtk.NewScrolledWindow()
+	scroll.SetPolicy(gtk.PolicyAutomatic, gtk.PolicyAutomatic)
+	scroll.SetChild(flowBox)
+
+	win.SetChild(scroll)
+	win.SetVisible(true)
+}
+
+func DraggableImage(path string) (pic *gtk.Picture) {
+	tex, err := gdk.NewTextureFromFilename(path)
 	if err != nil {
 		log.Fatal(err)
 	}
-	scroll.SetPolicy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-	scroll.Add(flowBox)
+	pic = gtk.NewPictureForPaintable(tex)
+	pic.SetHExpand(false)
+	pic.SetVExpand(false)
+	pic.SetCanShrink(false)
 
-	win.Add(scroll)
-	win.ShowAll()
-	gtk.Main()
-}
-
-type Draggable struct {
-	Picture *gtk.Image
-	EventBox *gtk.EventBox
-}
-
-func NewDraggable(path string) (d Draggable, err error) {
-	d.Picture, err = gtk.ImageNewFromFile(path)
-	if err != nil {
+	source := gtk.NewDragSource()
+	source.SetActions(gdk.ActionCopy)
+	pic.AddController(source)
+	source.ConnectPrepare(func(_, _ float64) (contentProvider *gdk.ContentProvider) {
+		contentProvider = gdk.NewContentProviderForBytes("text/uri-list", glib.NewBytes([]byte("file://" + path)))
 		return
-	}
-	d.EventBox, err = gtk.EventBoxNew()
-	if err != nil {
-		return
-	}
-	d.EventBox.Add(d.Picture)
-	ta, _ := gtk.TargetEntryNew("text/uri-list", 0, 0)
-	d.EventBox.DragSourceSet(gdk.BUTTON1_MASK, []gtk.TargetEntry{*ta}, gdk.ACTION_COPY)
-	d.EventBox.Connect("drag-begin", func(_ *gtk.EventBox, context *gdk.DragContext) {
-		gtk.DragSetIconPixbuf(context, d.Picture.GetPixbuf(), 0, 0)
 	})
-	d.EventBox.Connect("drag-data-get", func(_ *gtk.EventBox, _ *gdk.DragContext, selectionData *gtk.SelectionData, _ uint, _ uint) {
-		selectionData.SetURIs([]string{"file://" + path})
-	})
+	source.SetIcon(pic.Paintable(), 0, 0)
+
 	return
 }
 
