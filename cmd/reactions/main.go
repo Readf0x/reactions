@@ -67,7 +67,7 @@ func createWindow(win *gtk.ApplicationWindow) {
 	flowBox := gtk.NewFlowBox()
 	flowBox.SetSelectionMode(gtk.SelectionNone)
 	flowBox.SetHomogeneous(false)
-	flowBox.SetMaxChildrenPerLine(2)
+	flowBox.SetMaxChildrenPerLine(20)
 	flowBox.SetRowSpacing(8)
 	flowBox.SetColumnSpacing(8)
 
