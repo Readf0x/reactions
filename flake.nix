@@ -41,7 +41,7 @@ rec {
 
           src = ./.;
 
-          vendorHash = "sha256-jK87vZYfUe8znk65SmJ1mN8qP5K3dtt950hKGWTYXs4=";
+          vendorHash = "sha256-7aw44N+WO80AZu7BOxPjKAoYD23P88i2NzVvheLYTe8=";
 
           nativeBuildInputs = [pkgs.pkg-config];
           buildInputs = libs;
