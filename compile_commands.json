@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "/home/readf0x/Projects/vala/reactions",
+    "command": "valac --pkg gtk4 --output=reactions src/main.vala",
+    "file": "src/main.vala"
+  }
+]

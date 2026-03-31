@@ -1,59 +1,50 @@
-rec {
-  description = "Integral Prompt for zsh";
-
+{
+  description = "";
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
-
-  outputs = {
-    self,
-    flake-utils,
-    nixpkgs,
-    ...
-  }:
-    flake-utils.lib.eachSystem ["x86_64-linux"] (system: let
-      pkgs = import nixpkgs { inherit system; };
-      projectName = "reactions";
-      libs = with pkgs; [
-        pango
-        cairo
-        glib
-        gtk4
-        gobject-introspection
-      ];
-    in {
-      devShells.default = pkgs.mkShell {
-        packages = with pkgs;
-          [
-            go
-            delve
+  outputs = inputs @ {flake-parts, self, ...}:
+    flake-parts.lib.mkFlake {inherit inputs;} {
+      systems = ["x86_64-linux"];
+      perSystem = { system, pkgs, lib, ... }: let
+        dependencies = with pkgs; [
+          cairo
+          glib
+          # gtk3
+          gtk4
+          pango
+        ];
+      in {
+        devShells.default = pkgs.mkShell {
+          nativeBuildInputs = with pkgs; [
+            vala
+            vala-language-server
+            gnumake
             pkg-config
-          ]
-          ++ libs;
-
-        GSETTINGS_SCHEMA_DIR = "${pkgs.gtk4}/share/gsettings-schemas/${pkgs.gtk4.name}/glib-2.0/schemas";
-      };
-      packages = {
-        ${projectName} = pkgs.buildGoModule {
-          pname = projectName;
-          version = "0.1";
-
-          src = ./.;
-
-          vendorHash = "sha256-7aw44N+WO80AZu7BOxPjKAoYD23P88i2NzVvheLYTe8=";
-
-          nativeBuildInputs = [pkgs.pkg-config];
-          buildInputs = libs;
-
-          meta = {
-            inherit description;
-            # homepage = "";
-            # license = lib.licenses.;
-            # maintainers = with lib.maintainers; [  ];
-          };
+          ];
+          buildInputs = dependencies;
         };
-        default = self.packages.${system}.${projectName};
+        packages = rec {
+          reactions = pkgs.stdenv.mkDerivation (final: {
+            pname = "reactions";
+            version = "0.0.0";
+            src = ./.;
+
+            nativeBuildInputs = with pkgs; [ vala pkg-config ];
+            buildInputs = dependencies;
+
+            DESTDIR = placeholder "out";
+            PREFIX = "";
+
+            meta = {
+              description = "";
+              homepage = "https://git.gay/readf0x/reactions/";
+              license = lib.licenses.gpl3Only;
+            };
+          });
+          default = reactions;
+        };
       };
-    });
+    };
 }
